@@ -12,6 +12,7 @@ import * as bodyParser from 'body-parser';
 import * as cookieParser from 'cookie-parser';
 import * as morgan from 'morgan';
 import * as compression from 'compression';
+import * as wkhtmltopdf from 'wkhtmltopdf';
 
 // Angular 2
 import { enableProdMode } from '@angular/core';
@@ -94,11 +95,49 @@ function ngApp(req, res) {
   });
 
 }
+function ngAppPdf(req, res) {
+      console.warn('GOT TO NGAPPPDF');
+
+  function onHandleError(parentZoneDelegate, currentZone, targetZone, error)  {
+    console.warn('Error in SSR, serving for direct CSR');
+    res.sendFile('index.html', {root: './src'});
+    return false;
+  }
+
+  Zone.current.fork({ name: 'CSR fallback', onHandleError }).run(() => {
+    res.render('index', {
+      req,
+      res,
+      // time: true, // use this to determine what part of your app is slow only in development
+      preboot: false,
+      baseUrl: '/',
+      requestUrl: req.originalUrl,
+      originUrl: `http://localhost:${ app.get('port') }`
+    }, function(err, html) {
+      console.warn('GOT TO WKHTMLTOPDF');
+        (<any>wkhtmltopdf)(html, {
+          pageSize: 'A4',
+          debug: false,
+          printMediaType: true,
+          enableExternalLinks: true,
+          enableInternalLinks: true,
+          marginLeft: 0,
+          marginRight: 0,
+          images: true,
+          javascriptDelay: 1000,
+          footerCenter: '[page]/[topage]',
+          footerFontSize: 10
+        }).pipe(res);
+    });
+  });
+
+}
 
 /**
  * use universal for specific routes
  */
 app.get('/', ngApp);
+// app.get('/pdf', ngApp);
 routes.forEach(route => {
   app.get(`/${route}`, ngApp);
   app.get(`/${route}/*`, ngApp);
